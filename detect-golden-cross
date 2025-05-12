@@ -1,0 +1,39 @@
+//@version=6
+// © Liam4Chill
+indicator("DETECTOR GC - Liam4Chill", overlay=true)
+
+maShortLen = input.int(50, title="MA Courte (ex: 50)")
+maLongLen = input.int(200, title="MA Longue (ex: 200)")
+volLen = input.int(20, title="Période moyenne volume")
+volMultiplier = input.float(1.2, title="Multiplicateur volume")
+
+// === Moyennes mobiles === //
+maShort = ta.sma(close, maShortLen)
+maLong = ta.sma(close, maLongLen)
+
+// === Golden Cross récent (3 dernières bougies) === //
+goldenCrossRecent = (maShort[2] < maLong[2] and maShort[1] > maLong[1]) or (maShort[1] < maLong[1] and maShort > maLong)
+
+// === Volume === //
+volMA = ta.sma(volume, volLen)
+volumeOK = volume > volMA * volMultiplier or volume[1] > volMA[1] * volMultiplier
+
+
+
+// === Validation du Golden Cross complet === //
+validGC = goldenCrossRecent and volumeOK
+// === Pattern haussier === //
+realBody = math.abs(close - open)
+totalRange = high - low
+lowerShadow = math.min(open, close) - low
+upperShadow = high - math.max(open, close)
+bodyRatio = realBody / totalRange
+
+isHammer = close > open and lowerShadow > (2 * realBody) and upperShadow < (0.4 * realBody) and bodyRatio < 0.4
+isEngulfingBull = close > open and close > open[1] and open < close[1] and close[1] < open[1]
+patternOK = isHammer or isEngulfingBull
+
+// === Affichage === //
+plot(maShort, color=color.green, title="MA50", linewidth=2)
+plot(maLong, color=color.red, title="MA200", linewidth=2)
+plotshape(validGC, title="Golden Cross Validé", style=shape.labelup, location=location.belowbar, size=size.large, color=color.lime, text="✅")
