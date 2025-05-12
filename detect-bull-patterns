@@ -1,0 +1,75 @@
+//@version=6
+// © Liam4Chill - Version Intraday Optimisée
+indicator("Détecteur de Patterns Bullish Intraday", overlay=true)
+
+// === PARAMÈTRES GÉNÉRAUX === //
+maLength = input.int(50, title="Longueur de la moyenne mobile", group="Filtres de tendance")
+maType = input.string("SMA", title="Type de moyenne mobile", options=["SMA", "EMA", "VWMA"], group="Filtres de tendance")
+
+rsiLength = input.int(14, title="Période du RSI", group="Filtre RSI")
+rsiOversold = input.int(45, title="Niveau de survente (intraday)", group="Filtre RSI")
+useRsiFilter = input.bool(true, title="Activer le filtre RSI", group="Filtre RSI")
+
+volMultiplier = input.float(1.1, title="Multiplicateur de volume (souple)", group="Filtre Volume")
+volPeriod = input.int(20, title="Période pour la moyenne du volume", group="Filtre Volume")
+useVolumeFilter = input.bool(true, title="Activer le filtre de volume", group="Filtre Volume")
+
+bodyRatio = input.float(0.6, title="Ratio max corps/range pour Hammer", group="Paramètres Hammer")
+shadowRatio = input.float(1.2, title="Ratio min ombre basse/corps pour Hammer", group="Paramètres Hammer")
+piercingLinePercent = input.float(20.0, title="% minimum pénétration Piercing Line", minval=1, maxval=100, group="Paramètres Piercing Line")
+dojiThreshold = input.float(0.2, title="Seuil pour Doji (Morning Star)", group="Paramètres Morning Star")
+
+showRsi = input.bool(false, title="Afficher le RSI en sous-fenêtre", group="Affichage")
+
+// === CALCULS === //
+ma = switch maType
+    "SMA" => ta.sma(close, maLength)
+    "EMA" => ta.ema(close, maLength)
+    "VWMA" => ta.vwma(close, maLength)
+
+rsi = ta.rsi(close, rsiLength)
+isOversold = rsi <= rsiOversold
+
+volAvg = ta.sma(volume, volPeriod)
+isHighVolume = volume > volAvg * volMultiplier
+
+bullishCandle = close > open
+bearishCandle = close < open
+realBody = math.abs(close - open)
+totalRange = high - low
+upperShadow = high - math.max(open, close)
+lowerShadow = math.min(open, close) - low
+bodyToRangeRatio = realBody / totalRange
+
+prev_realBody = math.abs(close[1] - open[1])
+prev_open = open[1]
+prev_close = close[1]
+prev2_open = open[2]
+prev2_close = close[2]
+prev2_low = low[2]
+low1 = low[1]
+
+// === PATTERNS === //
+isHammer = bullishCandle and lowerShadow > (shadowRatio * realBody) and upperShadow < (0.6 * realBody) and bodyToRangeRatio < bodyRatio
+isPiercingLine = bullishCandle and bearishCandle[1] and open < close[1] and close > (open[1] + (prev_realBody * piercingLinePercent/100))
+isDoji = bodyToRangeRatio[1] < dojiThreshold
+isMorningStar = bullishCandle and bearishCandle[2] and isDoji and close > (prev2_open + prev2_close) / 2 and low1 < prev2_low
+
+// === FILTRES === //
+passRsiFilter = not useRsiFilter or isOversold
+passVolumeFilter = not useVolumeFilter or isHighVolume
+
+hammerValid = isHammer and close < ma and passRsiFilter and passVolumeFilter
+piercingLineValid = isPiercingLine and close < ma and passRsiFilter and passVolumeFilter
+morningStarValid = isMorningStar and close < ma and passRsiFilter and passVolumeFilter
+
+// === AFFICHAGE === //
+plot(ma, title="MA", color=color.gray, linewidth=1)
+plotshape(hammerValid, title="Hammer", location=location.belowbar, color=color.lime, style=shape.labelup, text="🔨", size=size.small)
+plotshape(piercingLineValid, title="Piercing Line", location=location.belowbar, color=color.green, style=shape.labelup, text="⚡", size=size.small)
+plotshape(morningStarValid, title="Morning Star", location=location.belowbar, color=color.blue, style=shape.labelup, text="⭐", size=size.small)
+plot(showRsi ? rsi : na, title="RSI", color=color.blue)
+
+alertcondition(hammerValid, title="Alerte Hammer", message="Marteau détecté!")
+alertcondition(piercingLineValid, title="Alerte Piercing Line", message="Piercing Line détectée!")
+alertcondition(morningStarValid, title="Alerte Morning Star", message="Morning Star détectée!")
