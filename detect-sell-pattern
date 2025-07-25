@@ -1,0 +1,64 @@
+//@version=6
+// © Liam4Chill - Bearish Reversal Intraday Pro
+indicator("SELL DETECTOR - Liam4Chill", overlay=true)
+
+// === PARAMÈTRES === //
+maLength = input.int(50, title="Longueur MA (filtre tendance)")
+volLength = input.int(20, title="Longueur MA Volume")
+volMultiplier = input.float(1.1, title="Multiplicateur Volume")
+rsiLength = input.int(14, title="Période RSI")
+rsiThreshold = input.int(65, title="RSI seuil de surachat")
+
+bodyRatioLimit = input.float(0.4, title="Max ratio corps / range pour pattern")
+upperShadowMin = input.float(1.2, title="Min ratio ombre haute / corps")
+piercingPenetration = input.float(0.5, title="% pénétration dans bougie précédente (piercing bear)")
+
+minScoreToTrigger = input.int(2, title="Score minimum pour générer un signal")
+
+// === CALCULS DE BASE === //
+ma = ta.sma(close, maLength)
+volMA = ta.sma(volume, volLength)
+rsi = ta.rsi(close, rsiLength)
+
+realBody = math.abs(close - open)
+totalRange = high - low
+upperShadow = high - math.max(open, close)
+lowerShadow = math.min(open, close) - low
+bodyToRangeRatio = realBody / totalRange
+
+prevOpen = open[1]
+prevClose = close[1]
+prevBullish = prevClose > prevOpen
+
+// === PATTERNS DE REVERSAL BAISSIER === //
+// 1. Pendu / shooting star
+patternWick = bodyToRangeRatio < bodyRatioLimit and upperShadow > (upperShadowMin * realBody) and lowerShadow < realBody * 0.3
+
+// 2. Doji haut
+patternDoji = bodyToRangeRatio < 0.15 and upperShadow > lowerShadow and upperShadow > 0.4 * totalRange
+
+// 3. Engulfing rouge
+engulfingRed = close < open and open > close[1] and close < open[1]
+
+// 4. Piercing Bear
+piercingBear = close < open and prevBullish and open > close[1] and close < open[1] and close < (open[1] + (close[1] - open[1]) * piercingPenetration)
+
+// 5. Divergence baissière RSI
+priceHigh = high[1] < high and high > high[2]
+rsiHigh = rsi[1] > rsi and rsi[1] > rsi[2]
+bearishDivergence = priceHigh and rsiHigh
+
+// === MODULES DE VALIDATION === //
+contextOK = close > ma
+volumeOK = volume > volMA * 1.2
+rsiOverbought = rsi > 70
+
+// === LOGIQUE DE SCORE === //
+score = (patternWick ? 1 : 0) + (patternDoji ? 1 : 0) + (engulfingRed ? 1 : 0) + (piercingBear ? 1 : 0) + (bearishDivergence ? 1 : 0) + (rsiOverbought ? 1 : 0)
+
+// === CONDITION FINALE === //
+enoughBars = bar_index > 5
+bearishSignal = enoughBars and contextOK and volumeOK and score >= minScoreToTrigger
+
+// === AFFICHAGE === //
+plotshape(bearishSignal, title="Alerte Sell Pro", location=location.abovebar, style=shape.labeldown, color=color.red, text="⚠️")
