@@ -1,6 +1,6 @@
 //@version=6
 // © Liam4Chill - Bearish Reversal Intraday Pro
-indicator("SELL DETECTOR - Liam4Chill", overlay=true)
+indicator("SELL DETECTOR TOOL - Liam4Chill", overlay=true)
 
 // === PARAMÈTRES === //
 maLength = input.int(50, title="Longueur MA (filtre tendance)")
